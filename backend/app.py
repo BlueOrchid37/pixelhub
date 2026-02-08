@@ -8,9 +8,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 cloudinary.config(
-    cloud_name="YOUR_CLOUD_NAME",
-    api_key="YOUR_API_KEY",
-    api_secret="YOUR_API_SECRET"
+    cloud_name="dux2q4ejf",
+    api_key="962568541917317",
+    api_secret="qtOEvsg2_jeYNxANNr_ylLy2ML4",
+    secure=True
 )
 
 
@@ -49,7 +50,7 @@ class Wallpaper(db.Model):
     image_url = db.Column(db.Text, nullable=False)
     resolution = db.Column(db.String(20), nullable=False)  # standard / 4k
     is_premium = db.Column(db.Boolean, default=False)
-    download_count = db.Column(db.Integer, default=0)
+    downloads = db.Column(db.Integer, default=0)
 
 
 # --------------------
@@ -64,32 +65,14 @@ def home():
 # USER APIs
 # --------------------
 
-@app.route("/api/users", methods=["POST"])
-def create_user():
-    data = request.get_json()
 
-    if not data or not data.get("username") or not data.get("account_type"):
-        return jsonify({"error": "username and account_type required"}), 400
-
-    user = User(
-        username=data["username"],
-        account_type=data["account_type"]
-    )
-
-    db.session.add(user)
-    db.session.commit()
-
-    return jsonify({
-        "message": "User created",
-        "user_id": user.id
-    }), 201
 
 
 # --------------------
 # WALLPAPER APIs
 # --------------------
 
-@app.route("/api/wallpapers", methods=["GET"])
+@app.route("/api/pixelhub/wallpapers", methods=["GET"])
 def get_wallpapers():
     account_type = request.args.get("account", "guest")
 
@@ -111,24 +94,29 @@ def get_wallpapers():
     return jsonify(result)
 
 
-@app.route("/api/wallpapers", methods=["POST"])
+@app.route("/api/pixelhub/wallpapers", methods=["POST"])
+@jwt_required()
 def add_wallpaper():
-    data = request.get_json()
+    file = request.files.get("image")
+    title = request.form.get("title")
+    is_premium = request.form.get("is_premium", "false") == "true"
 
-    if not data or not data.get("title") or not data.get("image_url"):
-        return jsonify({"error": "Missing fields"}), 400
+    if not file or not title:
+        return jsonify({"error": "Title and image required"}), 400
+
+    upload = cloudinary.uploader.upload(file)
 
     wallpaper = Wallpaper(
-        title=data["title"],
-        image_url=data["image_url"],
-        resolution=data.get("resolution", "standard"),
-        is_premium=data.get("is_premium", False)
+        title=title,
+        image_url=upload["secure_url"],
+        is_premium=is_premium
     )
 
     db.session.add(wallpaper)
     db.session.commit()
 
-    return jsonify({"message": "Wallpaper added"}), 201
+    return jsonify({"message": "Wallpaper uploaded"}), 201
+
 
 @app.route("/api/upload", methods=["POST"])
 def upload_wallpaper():
